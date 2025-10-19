@@ -6,7 +6,14 @@ This FastAPI app provides a "/me"endpoint that returns:
 - The current UTC timestamp
 - A random cat fact from the Cat Facts API
 
-## Example Response
+##  **API Endpoint**
+
+### **GET** `/me`
+
+**Base URL:**
+[https://written-rey-chiedozie-735aaaa7.koyeb.app/me](https://written-rey-chiedozie-735aaaa7.koyeb.app/me)
+
+## Sample Response
 ```json
 {
     "status": "success",
