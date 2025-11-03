@@ -71,10 +71,10 @@ async def earthquake_agent_endpoint(request: A2ARequest):
 		# Format response according to A2A protocol
 		return A2AResponse(
 			response = response.response,
-			conversationId=request.conversationId
+			conversationId=request.conversationId,
 			metadata={
 				"event_count": len(response.events) if response.events else 0,
-				"agent type": "earthquake_monitor"
+				"agent type": "earthquake_monitor",
 				"timestamp": datetime.utcnow().isoformat()
 			}
 		)
