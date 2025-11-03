@@ -70,7 +70,7 @@ class EarthquakeAgent:
 		if not events:
 			return f"No earthquakes found with magnitude {filters.min_magnitude}+ in the last {filters.hours_back} hours."
 
-		response = f"Found {len(events)} earthquakes(s) in the last {filters.hours_back} hours:\n\n"
+		response = f"Found {len(events)} earthquake(s) in the last {filters.hours_back} hours:\n\n"
 
 		for i, event in enumerate(events, 1):
 			tsunami_warn = " TSUNAMI WARNING " if event.tsunami else ""
@@ -94,7 +94,7 @@ class EarthquakeAgent:
 			return TelexResponse(
 				response = "Hello! I'm your earthquake monitoring agent. I can help you track recent earthquakes worldwide. \n\n"
 					"Try asking me:\n"
-					". 'Show eartquakes above magnitude 5'\n"
+					". 'Show earthquakes above magnitude 5'\n"
 					". 'Earthquakes in Japan in the last 24 hours'\n"
 					". 'Show me the last 5 earthquakes'"
 					". 'Magnitue 6+ earthquakes today'"
@@ -104,14 +104,14 @@ class EarthquakeAgent:
 		if 'help' in message_lower:
 			return TelexResponse(
 				response = "Here's what I can do:\n\n"
-					"I monitor earthquakes worlwide and can filter by:\n"
+					"I monitor earthquakes worldwide and can filter by:\n"
 					". Magnitude (e.g., 'magnitude 5+', 'above 6.0')\n"
 					". Time range (e.g., 'last hour', 'today', 'past week')\n"
 					". Location (e.g., 'in California', 'near Japan')\n"
 					". Number of results (e.g., 'show 5 earthquakes')\n\n"
-					"Example queries:\,"
+					"Example queries:\n,"
 					". 'Earthquakes above magnitude 5 in the last 24 hours'\n"
-					". 'Show 10 recent earthquaks near Indonesia'\n"
+					". 'Show 10 recent earthquakes near Indonesia'\n"
 					". 'Magnitude 4+ earthquakes in California today'"
 			)
 		# Process earthquake query

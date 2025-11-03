@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional
 import uvicorn
 from .agent import EarthquakeAgent
 from .models import TelexMessage, TelexResponse
+
+
 
 app = FastAPI(
 	title="Earthquake Monitoring Agent",
@@ -28,12 +31,14 @@ agent = EarthquakeAgent()
 # Telex.im A2A Protocol Models
 class A2ARequest(BaseModel):
 	"""A2A Protocol request format"""
-	prompt: str
+	message: str
+	conversationId: Optional[str] = None
+	userId: Optional[str] = None
 	context: Optional[dict] = None
-	user_id: Optional[str] = None
 class A2AResponse(BaseModel):
 	"""A2A Protocol response format"""
-	text: str
+	response: str
+	converationId: Optional[str]
 	metadata: Optional[dict] = None
 
 @app.get("/")
@@ -61,19 +66,25 @@ async def earthquake_agent_endpoint(request: A2ARequest):
 	"""
 	try:
 		# Process the message using our agent
-		response = await agent.process_message(request.prompt)
+		response = await agent.process_message(request.message)
 
 		# Format response according to A2A protocol
 		return A2AResponse(
-			text = response.response,
+			response = response.response,
+			conversationId=request.conversationId
 			metadata={
 				"event_count": len(response.events) if response.events else 0,
 				"agent type": "earthquake_monitor"
+				"timestamp": datetime.utcnow().isoformat()
 			}
 		)
 	except Exception as e:
-		raise HTTPException(status_code=500, detail=str(e))
-
+		return A2AResponse(
+			response=f"I encounteres an error processing your request: {str(e)}",
+			conversationId=request.conversationId,
+			metadata={"error": True, "error_type": type(e).__name__}
+		)
+	
 @app.post("/chat", response_model=TelexResponse)
 async def chat_endpoint(message: TelexMessage):
 	"""
