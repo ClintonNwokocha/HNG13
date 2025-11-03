@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 import uvicorn
@@ -28,11 +28,18 @@ agent = EarthquakeAgent()
 
 # Telex.im A2A Protocol Models
 class A2ARequest(BaseModel):
-    """A2A Protocol request format"""
-    prompt: str
-    conversationId: Optional[str] = None
-    userId: Optional[str] = None
-    context: Optional[dict] = None
+   
+    prompt: str | None = Field(default=None)
+    message: str | None = Field(default=None)
+    text: str | None = Field(default=None)
+    input: str | None = Field(default=None)
+
+    conversationId: str | None = None
+    userId: str | None = None
+    context: dict | None = None
+
+    class Config:
+        extra = "allow" 
 
 class A2AResponse(BaseModel):
     """A2A Protocol response format"""
@@ -57,34 +64,32 @@ async def health_check():
 
 @app.post("/a2a/agent/earthquake", response_model=A2AResponse)
 async def earthquake_agent_endpoint(request: A2ARequest):
-    """
-    Main A2A endpoint for telex.im integration
-
-    This endpoint follows the Agent-to-Agent (A2A) protocol
-    that telex.im uses to communicate with agents.
-    """
     try:
-        print(f"[A2A] Received: {request.prompt}")
-        
-        # Process the message using our agent - USE request.prompt NOT request.message!
-        response = await agent.process_message(request.prompt)
-        
-        print(f"[A2A] Generated response with {len(response.events or [])} events")
+        user_text = request.prompt or request.message or request.text or request.input
+        if not user_text:
+            return A2AResponse(
+                response="I didn't receive any text. Try: 'Show earthquakes above magnitude 5 in the last 24 hours'.",
+                conversationId=request.conversationId,
+                metadata={"error": True, "reason": "missing_text_key"}
+            )
 
-        # Format response according to A2A protocol
+        print(f"[A2A] Received: {user_text}")
+        resp = await agent.process_message(user_text)
+        print(f"[A2A] Generated response with {len(resp.events or [])} events")
+
         return A2AResponse(
-            response=response.response,
+            response=resp.response,
             conversationId=request.conversationId,
             metadata={
-                "events_count": len(response.events) if response.events else 0,
+                "events_count": len(resp.events or []),
                 "agent_type": "earthquake_monitor",
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
     except Exception as e:
-        print(f"[A2A] Error: {str(e)}")
+        print(f"[A2A] Error: {e}")
         return A2AResponse(
-            response=f"I encountered an error processing your request: {str(e)}",
+            response=f"I encountered an error processing your request: {e}",
             conversationId=request.conversationId,
             metadata={"error": True, "error_type": type(e).__name__}
         )
