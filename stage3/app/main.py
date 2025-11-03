@@ -31,14 +31,14 @@ agent = EarthquakeAgent()
 # Telex.im A2A Protocol Models
 class A2ARequest(BaseModel):
 	"""A2A Protocol request format"""
-	message: str
+	prompt: str
 	conversationId: Optional[str] = None
 	userId: Optional[str] = None
 	context: Optional[dict] = None
 class A2AResponse(BaseModel):
 	"""A2A Protocol response format"""
 	response: str
-	converationId: Optional[str]
+	conversationId: Optional[str]
 	metadata: Optional[dict] = None
 
 @app.get("/")
