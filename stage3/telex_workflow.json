@@ -12,9 +12,9 @@
       "name": "earthquake_monitor",
       "parameters": {},
       "position": [500, 200],
-      "type": "a2a/generic-a2a-node",
+      "type": "a2a/mastra-a2a-node",
       "typeVersion": 1,
-      "url": "hng13-production-ce78.up.railway.app"
+      "url": "https://hng13-production-ce78.up.railway.app/a2a/agent/earthquake"
     }
   ],
   "pinData": {},

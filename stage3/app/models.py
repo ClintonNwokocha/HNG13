@@ -3,12 +3,6 @@ from typing import Optional, List
 from datetime import datetime
 
 
-class A2AResponse(BaseModel):
-    response: str
-    conversationId: Optional[str] = None
-    metadata: Optional[dict] = None
-
-
 class EarthquakeFilter(BaseModel):
     min_magnitude: Optional[float] = Field(default=4.5, description="Minimum magnitude")
     max_magnitude: Optional[float] = Field(default=None, description="Maximum magnitude")

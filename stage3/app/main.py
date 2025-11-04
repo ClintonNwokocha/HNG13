@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .agent import EarthquakeAgent
-from .models import A2AResponse
 
 app = FastAPI(
     title="Earthquake Monitoring Agent",
@@ -12,12 +11,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS: allow Telex.* and local testing
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "https://app.telex.im", "https://*.telex.im"],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["POST", "OPTIONS", "GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -25,18 +23,14 @@ agent = EarthquakeAgent()
 
 
 def extract_text_from_request(data: Dict[str, Any]) -> Optional[str]:
-    """
-    Extract text from common A2A payload shapes:
-    - {text|message|prompt|input|query: "..."}
-    - {"params": {"message": {"parts":[{"kind":"text","text":"..."}]}}}
-    """
-    # Simple keys first
+    """Extract text from A2A payload"""
+    # Simple keys
     for key in ("text", "message", "prompt", "input", "query"):
         val = data.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
 
-    # JSON-RPC-ish format (Telex style)
+    # JSON-RPC format (Telex)
     params = data.get("params")
     if isinstance(params, dict):
         msg = params.get("message")
@@ -48,13 +42,21 @@ def extract_text_from_request(data: Dict[str, Any]) -> Optional[str]:
                         t = (part.get("text") or "").strip()
                         if t:
                             return t
-
     return None
+
+
+@app.get("/")
+async def root():
+    return {
+        "name": "Earthquake Monitoring Agent",
+        "version": "1.0.0",
+        "status": "active"
+    }
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "ts": datetime.utcnow().isoformat() + "Z"}
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.post("/a2a/agent/earthquake")
@@ -64,20 +66,29 @@ async def telex_handler(request: Request):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    text = extract_text_from_request(body) or "recent"
+    print(f"[A2A] Received body: {body}", flush=True)
+    
+    text = extract_text_from_request(body)
+    if not text:
+        text = "recent"
+    
+    print(f"[A2A] Extracted text: {text}", flush=True)
 
-    # Use the async processing entrypoint
     result = await agent.process_message(text)
 
-    # Telex-friendly envelope
-    return A2AResponse(
-        response=result.response,
-        conversationId=body.get("conversationId"),
-        metadata={"count": len(result.events or [])},
-    ).dict()
+    response = {
+        "response": result.response,
+        "conversationId": body.get("conversationId"),
+        "metadata": {
+            "count": len(result.events or []),
+            "agent_type": "earthquake_monitor"
+        }
+    }
+    
+    print(f"[A2A] Sending response: {response['response'][:100]}...", flush=True)
+    return response
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    # Close the httpx client cleanly
     await agent.close()

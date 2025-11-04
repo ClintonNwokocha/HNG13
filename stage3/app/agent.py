@@ -11,13 +11,12 @@ class EarthquakeAgent:
     def __init__(self):
         self.api_client = EarthquakeAPIClient()
 
-    # ---------- parsing ----------
     def parse_message(self, message: str) -> EarthquakeFilter:
         msg = (message or "").strip()
         low = msg.lower()
         f = EarthquakeFilter()
 
-        # Magnitude: >=5, > 5, 5+, m5+, magnitude 5.2, etc.
+        # Magnitude patterns
         patterns = [
             r'>=\s*([0-9]+(?:\.[0-9]+)?)',
             r'>\s*=\s*([0-9]+(?:\.[0-9]+)?)',
@@ -35,23 +34,22 @@ class EarthquakeAgent:
                 except ValueError:
                     pass
 
-        # Hours / days: "last 24 hours", "past 7 days", "in the last 7 days"
-        # hours
+        # Time patterns
         mh = re.search(r'(?:last|past)\s+(\d+)\s+hours?', low)
         if mh:
             f.hours_back = int(mh.group(1))
-        # days
+        
         md = re.search(r'(?:last|past)\s+(\d+)\s+days?', low)
         if md:
             f.hours_back = int(md.group(1)) * 24
-        # "today"
+        
         if re.search(r'\btoday\b', low):
             f.hours_back = max(f.hours_back or 0, 24)
-        # "week" (fallback)
+        
         if re.search(r'\bweek\b', low) and not md:
             f.hours_back = max(f.hours_back or 0, 7 * 24)
 
-        # Limit: "show 10", "list 5", "get 20"
+        # Limit
         mlimit = re.search(r'(?:show|list|get)\s+(\d+)', low)
         if mlimit:
             try:
@@ -59,7 +57,7 @@ class EarthquakeAgent:
             except ValueError:
                 pass
 
-        # Location (prefer trailing "in|near|around X", ignoring "in the last N ...")
+        # Location
         loc = None
         mloc = re.search(r'(?:\b(in|near|around)\b)\s+([A-Za-z][A-Za-z\s\-\.,]+)$', low)
         if mloc:
@@ -67,8 +65,8 @@ class EarthquakeAgent:
             if not re.search(r'^\s*the\s+last\s+\d+\s+(?:days?|hours?)\s*$', candidate):
                 words = candidate.split()
                 loc = " ".join(words[:4])
+        
         if not loc:
-            # fallback to last occurrence of these tokens
             for kw in [" in ", " near ", " around "]:
                 if kw in low:
                     part = low.rsplit(kw, 1)[-1].strip()
@@ -76,14 +74,13 @@ class EarthquakeAgent:
                         continue
                     loc = " ".join(part.split()[:4]).strip('.,!?')
                     break
+        
         if loc:
             f.location = loc
 
         return f
 
-    # ---------- formatting ----------
     def _format_response(self, events: List[EarthquakeEvent], filters: EarthquakeFilter) -> str:
-        # Human period string
         hrs = int(filters.hours_back or 24)
         period = f"last {hrs} hour{'s' if hrs != 1 else ''}"
         mag = f"{(filters.min_magnitude or 0):.1f}+"
@@ -109,14 +106,12 @@ class EarthquakeAgent:
             lines.append(f"   Lat: {ev.latitude:.2f}, Lon: {ev.longitude:.2f} | Depth: {ev.depth:.1f} km{tsunami}{alert}")
             if ev.url:
                 lines.append(f"   {ev.url}")
-            lines.append("")  # blank line between items
+            lines.append("")
         return "\n".join(lines).rstrip()
 
-    # ---------- main entry ----------
     async def process_message(self, message: str) -> TelexResponse:
         low = (message or "").lower()
 
-        # Greetings
         if any(g in low for g in ["hello", "hi", "hey"]):
             return TelexResponse(
                 response=(
@@ -128,7 +123,6 @@ class EarthquakeAgent:
                 )
             )
 
-        # Help
         if "help" in low:
             return TelexResponse(
                 response=(
@@ -140,7 +134,6 @@ class EarthquakeAgent:
                 )
             )
 
-        # Normal query
         try:
             filters = self.parse_message(message)
             events = await self.api_client.get_earthquakes(filters)

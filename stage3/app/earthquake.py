@@ -1,4 +1,3 @@
-# app/earthquake.py
 import httpx
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
@@ -17,7 +16,7 @@ class EarthquakeAPIClient:
         params: Dict[str, str] = {
             "format": "geojson",
             "starttime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "endtime":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "endtime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "minmagnitude": f"{filters.min_magnitude or 0}",
             "orderby": "time",
             "limit": f"{min(max(filters.limit or 10, 1), 200)}",
@@ -43,7 +42,6 @@ class EarthquakeAPIClient:
             geom = feat.get("geometry") or {}
             coords = (geom.get("coordinates") or [None, None, None])
 
-            # Simple global substring filter if a location was provided
             if loc:
                 place_text = (props.get("place") or "").lower()
                 if loc not in place_text:
