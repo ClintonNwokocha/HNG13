@@ -1,59 +1,83 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, Any, Dict
-import uvicorn
-from .agent import EarthquakeAgent
-from .models import TelexMessage, TelexResponse
+from typing import Any, Dict, Optional
 
+from .agent import EarthquakeAgent
+from .models import A2AResponse
 
 app = FastAPI(
     title="Earthquake Monitoring Agent",
     description="Real-time global earthquake monitoring agent for Telex.im",
-    version="1.0.0"
+    version="1.0.0",
 )
 
-# Add CORS middleware for Telex.im integration
+# CORS: allow Telex.* and local testing
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*", "https://app.telex.im", "https://*.telex.im"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST", "OPTIONS", "GET"],
     allow_headers=["*"],
 )
 
-# Initialize agent
 agent = EarthquakeAgent()
 
-# Telex.im A2A Protocol Models
-class A2AResponse(BaseModel):
-    """A2A Protocol response format"""
-    response: str
-    conversationId: Optional[str] = None
-    metadata: Optional[dict] = None
 
 def extract_text_from_request(data: Dict[str, Any]) -> Optional[str]:
-    """Extract user text from various request formats including JSON-RPC"""
-    
-    # Try direct text fields first
-    for key in ['prompt', 'message', 'text', 'input', 'query']:
-        if key in data and isinstance(data[key], str):
-            return data[key]
-    
-    # Handle JSON-RPC format from Telex
-    if 'params' in data:
-        params = data['params']
-        if isinstance(params, dict) and 'message' in params:
-            msg = params['message']
-            if isinstance(msg, dict) and 'parts' in msg:
-                # Extract text from parts array
-                parts = msg['parts']
-                if isinstance(parts, list):
-                    for part in parts:
-                        if isinstance(part, dict) and part.get('kind') == 'text':
-                            text = part.get('text', '').strip()
-                            if text:
-                                return text
-    
+    """
+    Extract text from common A2A payload shapes:
+    - {text|message|prompt|input|query: "..."}
+    - {"params": {"message": {"parts":[{"kind":"text","text":"..."}]}}}
+    """
+    # Simple keys first
+    for key in ("text", "message", "prompt", "input", "query"):
+        val = data.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+
+    # JSON-RPC-ish format (Telex style)
+    params = data.get("params")
+    if isinstance(params, dict):
+        msg = params.get("message")
+        if isinstance(msg, dict):
+            parts = msg.get("parts")
+            if isinstance(parts, list):
+                for part in parts:
+                    if isinstance(part, dict) and part.get("kind") == "text":
+                        t = (part.get("text") or "").strip()
+                        if t:
+                            return t
+
     return None
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "ts": datetime.utcnow().isoformat() + "Z"}
+
+
+@app.post("/a2a/agent/earthquake")
+async def telex_handler(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    text = extract_text_from_request(body) or "recent"
+
+    # Use the async processing entrypoint
+    result = await agent.process_message(text)
+
+    # Telex-friendly envelope
+    return A2AResponse(
+        response=result.response,
+        conversationId=body.get("conversationId"),
+        metadata={"count": len(result.events or [])},
+    ).dict()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Close the httpx client cleanly
+    await agent.close()

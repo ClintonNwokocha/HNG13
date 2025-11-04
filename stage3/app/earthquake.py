@@ -1,73 +1,74 @@
+# app/earthquake.py
 import httpx
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict
 from .models import EarthquakeEvent, EarthquakeFilter
 
 class EarthquakeAPIClient:
-	"""Client for USGS Earthquake API"""
+    BASE_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 
-	BASE_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+    def __init__(self):
+        self.client = httpx.AsyncClient(timeout=30.0)
 
-	def __init__(self):
-		self.client = httpx.AsyncClient(timeout=30.0)
+    async def get_earthquakes(self, filters: EarthquakeFilter) -> List[EarthquakeEvent]:
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(hours=int(filters.hours_back or 24))
 
-	async def get_earthquakes(self, filters: EarthquakeFilter) -> List[EarthquakeEvent]:
-		"""Fetch earthquakes based on filter criteria"""
+        params: Dict[str, str] = {
+            "format": "geojson",
+            "starttime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "endtime":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "minmagnitude": f"{filters.min_magnitude or 0}",
+            "orderby": "time",
+            "limit": f"{min(max(filters.limit or 10, 1), 200)}",
+        }
+        if filters.max_magnitude is not None:
+            params["maxmagnitude"] = f"{filters.max_magnitude}"
 
-		# Calculate time range
-		end_time = datetime.utcnow()
-		start_time = end_time - timedelta(hours=filters.hours_back)
+        print("[USGS] Query params =>", params, flush=True)
 
+        try:
+            resp = await self.client.get(self.BASE_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        except httpx.HTTPError as e:
+            print(f"[USGS] HTTP error: {e}", flush=True)
+            return []
 
-		# build query params
-		params = {
-			"format": "geojson",
-			"starttime": start_time.isoformat(),
-			"endtime": end_time.isoformat(),
-			"minmagnitude": filters.min_magnitude,
-			"orderby": "magnitude",
-			"limit": filters.limit
-		}
+        events: List[EarthquakeEvent] = []
+        loc = (filters.location or "").lower().strip() or None
 
-		if filters.max_magnitude:
-			params["maxmagnitude"] = filters.max_magnitude
+        for feat in data.get("features", []):
+            props = feat.get("properties") or {}
+            geom = feat.get("geometry") or {}
+            coords = (geom.get("coordinates") or [None, None, None])
 
-		try:
-			response = await self.client.get(self.BASE_URL, params=params)
-			response.raise_for_status()
-			data = response.json()
+            # Simple global substring filter if a location was provided
+            if loc:
+                place_text = (props.get("place") or "").lower()
+                if loc not in place_text:
+                    continue
 
-			events = []
-			for feature in data.get("features", []):
-				props = feature["properties"]
-				coords = feature["geometry"]["coordinates"]
+            try:
+                events.append(
+                    EarthquakeEvent(
+                        id=feat.get("id", ""),
+                        magnitude=props.get("mag") or 0.0,
+                        place=props.get("place") or "Unknown location",
+                        time=datetime.fromtimestamp((props.get("time") or 0)/1000, tz=timezone.utc),
+                        latitude=float(coords[1]),
+                        longitude=float(coords[0]),
+                        depth=float(coords[2]),
+                        url=props.get("url") or "",
+                        alert_level=props.get("alert"),
+                        tsunami=(props.get("tsunami") == 1),
+                    )
+                )
+            except Exception as e:
+                print(f"[USGS] Skip malformed feature: {e}", flush=True)
+                continue
 
-				# Filter by location if specified
-				if filters.location:
-					place = props.get("place", "").lower()
-					if filters.location.lower() not in place:
-						continue
+        return events
 
-				event = EarthquakeEvent(
-					id=feature["id"],
-					magnitude=props.get("mag", 0),
-					place=props.get("place", "Unknown location"),
-					time=datetime.fromtimestamp(props.get("time", 0) / 1000),
-					latitude=coords[1],
-					longitude=coords[0],
-					depth=coords[2],
-					url=props.get("url", ""),
-					alert_level=props.get("alert"),
-					tsunami=props.get("tsunami", 0) == 1
-				)
-				events.append(event)
-
-			return events
-
-		except httpx.HTTPError as e:
-			print(f"Error fetching earthquakes: {e}")
-			return []
-
-	async def close(self):
-		"""Close the HTTP client"""
-		await self.client.aclose()
+    async def close(self):
+        await self.client.aclose()

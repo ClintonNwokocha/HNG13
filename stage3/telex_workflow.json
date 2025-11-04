@@ -1,25 +1,24 @@
 {
-    "active": true,
-    "category": "monitoring",
-    "description": "Real-time global earthquake monitoring agent",
-    "id": "earthquake_monitor_v1",
-    "long_description": "\nYou are an intelligent earthquake monitoring assistant that provides real-time information about seismic events worldwide.\n\nYour primary functions:\n- Monitor earthquakes globally using USGS data\n- Filter events by magnitude, time range, and location\n- Provide detailed event information including coordinates, depth, and alerts\n- Alert users to significant seismic activity and tsunami warnings\n\nWhen responding:\n- Always provide clear, formatted earthquake data\n- Include relevant details: magnitude, location, time, coordinates, depth\n- Highlight any tsunami warnings or alert levels\n- Be concise but informative\n- Help users understand the significance of earthquake magnitudes\n- If location is ambiguous, ask for clarification\n- Default to magnitude 4.5+ for the last 24 hours if no criteria specified\n",
-    "name": "earthquake_monitor",
-    "nodes": [
-        {
-            "id": "earthquake_agent",
-            "name": "Earthquake Monitoring Agent",
-            "parameters": {},
-            "position": [500, 200],
-            "type": "a2a/mastra-a2a-node",
-            "typeVersion": 1,
-            "url": "https://hng13-production-ce78.up.railway.app/a2a/agent/earthquake"
-        }
-    ],
-    "pinData": {},
-    "settings": {
-        "executionOrder": "v1"
-    },
-    "short_description": "Monitor earthquakes worldwide with customizable alerts"
-
+  "active": true,
+  "category": "utilities",
+  "description": "Real-time global earthquake monitoring agent",
+  "id": "earthquake_monitor_v1",
+  "name": "earthquake_monitor",
+  "long_description": "You are an intelligent earthquake monitoring assistant that provides real-time information about seismic events worldwide.\n\nPrimary functions:\n- Monitor earthquakes globally using USGS data\n- Filter by magnitude, time range, and location\n- Provide details: magnitude, location, time, coordinates, depth\n- Highlight tsunami warnings/alerts\n\nResponse rules:\n- Clear, formatted data\n- Be concise but informative\n- Default to M4.5+ in last 24h if no criteria\n- If location is ambiguous, ask for clarification\n",
+  "short_description": "Monitor earthquakes worldwide with customizable alerts",
+  "nodes": [
+    {
+      "id": "earthquake_monitor_v1",
+      "name": "earthquake_monitor",
+      "parameters": {},
+      "position": [500, 200],
+      "type": "a2a/generic-a2a-node",
+      "typeVersion": 1,
+      "url": "hng13-production-ce78.up.railway.app"
+    }
+  ],
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
